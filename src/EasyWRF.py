@@ -223,7 +223,7 @@ class Load_Domain(object):
 
         # Plot UNIVIE Logo
         try:
-            img = plt.imread(modulepath+'/shapefiles/logo_imgw.png')
+            img = plt.imread(modulepath+'/../shapefiles/logo_imgw.png')
             fig.figimage(img, 0, 0)
         except Exception as e:
             print e, 'unable to plot imgw logo'
@@ -238,10 +238,10 @@ class Load_Domain(object):
 
         if self.austrianborders:
             try:
-                #self.bm.readshapefile(modulepath+'../shapefiles/AUT_adm0', 'AUT_adm0', color='k', linewidth=.6)
-                self.bm.readshapefile(modulepath+'../shapefiles/AUT_adm1', 'AUT_adm1', color='k', linewidth=.4)
+                #self.bm.readshapefile(modulepath+'/../shapefiles/AUT_adm0', 'AUT_adm0', color='k', linewidth=.6)
+                self.bm.readshapefile(modulepath+'/../shapefiles/AUT_adm1', 'AUT_adm1', color='k', linewidth=.4)
                 if self.bezirk:
-                    self.bm.readshapefile(modulepath+'../shapefiles/AUT_adm2', 'AUT_adm2', color='k', linewidth=.1)
+                    self.bm.readshapefile(modulepath+'/../shapefiles/AUT_adm2', 'AUT_adm2', color='k', linewidth=.1)
             except:
                 print "unable to plot gi shape files"
                 raise
