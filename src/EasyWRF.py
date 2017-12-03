@@ -2,7 +2,7 @@
 """Plotting Library for wrfout files.
 
 author: Lukas Kugler
-date: 03-11-2017
+date: 03-12-2017
 
 Major bug:  - PRIORITY LOW
 kommt nicht zurecht, wenn nur ein wrfout file im ordner liegt!
@@ -39,6 +39,15 @@ kts_per_mps = 1.94384   # kts = mps * kts_per_mps
 c_p = 1005
 R_d = 287.16
 
+def _check_2D(data):
+    if len(data.shape) == 3:
+        N_images = data.shape[0]
+    elif len(data.shape) == 2:
+        N_images = 1
+    else:
+        raise NotImplementedError(['Data more than 2D! data.shape:', data.shape])
+    return N_images
+
 def PressReduction(QFE, ALT):
     """Pressure reduction according to ICAO.
 
@@ -63,13 +72,12 @@ def PressReduction(QFE, ALT):
 class Load_Domain(object):
     """HIGH LEVEL THING
 
-    from myWRF_plotlib import wrfout_plotter
+    import EasyWRF
 
-    ThisWRF = wrfout_plotter.Load_Domain('./wrfout_dir/', 'DomainName')
+    ThisWRF = EasyWRF.Load_Domain('./wrfout_dir/', 'DomainName')
 
-    ThisWRF.plot_hgt()      # single image
-    ThisWRF.plot2Dvar('OLR') # OLR images for all times
-
+    ThisWRF.plot('HGT')      # variables available within wrfout file
+    ThisWRF.plot_derived('BT')  # calculated Brightness Temperature from OLR
 
     """
     def __init__(self, WRFout_data_directory, domainname="MyDomain",
@@ -247,6 +255,9 @@ class Load_Domain(object):
         print fname, 'saved'
 
     #####################################################################################
+    def _load_var(self, var):
+        return to_np(getvar(self.data, var, timeidx=ALL_TIMES, method="cat"))
+
     """Plotting Routines"""
 
     def _plot_heatmap(self, data_2D,
@@ -592,27 +603,14 @@ class Load_Domain(object):
                  'BT': 'Brightness Temperature'
                  }
 
-        def __load_var(var):
-            return to_np(getvar(self.data, var, timeidx=ALL_TIMES, method="cat"))
-
-        def __check_2D(data):
-            if len(data.shape) == 3:
-                N_images = data.shape[0]
-            elif len(data.shape) == 2:
-                N_images = 1
-            else:
-                raise NotImplementedError(['Data more than 2D! data.shape:', data.shape])
-            return N_images
-
-
         if var=='TE':
             try:
                 print 'loading variables ...'
-                U = __load_var('U')[:,:-1,:,:]      #  [:,:-1,:,:] ghört weg, is nur weil vertical grid dp unklar is
-                V = __load_var('V')[:,:-1,:,:]
-                P = __load_var('P')
-                Ps = __load_var('PSFC')
-                T = __load_var('T')[:,:-1,:,:]
+                U = _load('U')[:,:-1,:,:]      #  [:,:-1,:,:] ghört weg, is nur weil vertical grid dp unklar is
+                V = _load('V')[:,:-1,:,:]
+                P = _load('P')
+                Ps = _load('PSFC')
+                T = _load('T')[:,:-1,:,:]
                 T00 = [float(self.data[i]['T00'][:]) for i in range(len(self.data))]
                 for i in range(len(self.data)):
                     T[i,:,:,:] = T[i,:,:,:] + T00[i]
@@ -636,7 +634,7 @@ class Load_Domain(object):
             dTE = TE[:,:,:] - TE[1,:,:]
 
             # Error check for plotting
-            N_images = __check_2D(dTE)
+            N_images = _check_2D(dTE)
 
             # plotting range
             minval = np.nanmin(dTE[1:,:,:])
@@ -659,10 +657,10 @@ class Load_Domain(object):
         elif var=='SYN-SFC':
             try:
                 print 'loading variables ...'
-                U = __load_var('U')[:,0,:,:]
-                V = __load_var('V')[:,0,:,:]
-                T = __load_var('T')[:,0,:,:]
-                PSFC = __load_var('PSFC')
+                U = _load('U')[:,0,:,:]
+                V = _load('V')[:,0,:,:]
+                T = _load('T')[:,0,:,:]
+                PSFC = _load('PSFC')
             except IOError as e:
                 print(e, 'loading failed')
 
@@ -681,7 +679,7 @@ class Load_Domain(object):
             figtitle = avail[var]
             save_name = 'SYN-SFC'
 
-            N_images = __check_2D(PMSL)  # Error check for plotting
+            N_images = _check_2D(PMSL)  # Error check for plotting
 
             if np.nanmax(PMSL)>1200 or np.nanmin(PMSL)<700:
                 raise RuntimeError('PMSL not in hPa; max(p):'+str(np.nanmax(PMSL))+'min(p)'+str(np.nanmin(PMSL)))
@@ -699,11 +697,11 @@ class Load_Domain(object):
         elif var=='Synoptik':
             try:
                 print 'loading variables ...'
-                U = __load_var('U')[:,:-1,:,:]      #  [:,:-1,:,:] ghört weg, is nur weil vertical grid dp unklar is
-                V = __load_var('V')[:,:-1,:,:]
-                #P = __load_var('P')
-                PSFC = __load_var('PSFC')
-                T = __load_var('T')[:,:-1,:,:]
+                U = _load('U')[:,:-1,:,:]      #  [:,:-1,:,:] ghört weg, is nur weil vertical grid dp unklar is
+                V = _load('V')[:,:-1,:,:]
+                #P = _load('P')
+                PSFC = _load('PSFC')
+                T = _load('T')[:,:-1,:,:]
                 T00 = [float(self.data[i]['T00'][:]) for i in range(len(self.data))]
                 for i in range(len(self.data)):
                     T[i,:,:,:] = T[i,:,:,:] + T00[i]
@@ -721,7 +719,7 @@ class Load_Domain(object):
             figtitle = avail[var]
             save_name = 'SYN'
 
-            N_images = __check_2D(PMSL)  # Error check for plotting
+            N_images = _check_2D(PMSL)  # Error check for plotting
 
             for i in range(N_images):
 
@@ -743,8 +741,8 @@ class Load_Domain(object):
         elif var=='SRH':
             try:
                 print 'loading variables ...'
-                U = __load_var('U')[:,0,:,:]
-                V = __load_var('V')[:,0,:,:]
+                U = _load('U')[:,0,:,:]
+                V = _load('V')[:,0,:,:]
             except IOError as e:
                 print(e, 'loading failed')
 
@@ -763,7 +761,7 @@ class Load_Domain(object):
             save_name = 'SRH'
             self.cbar_label = 'J/kg'
 
-            N_images = __check_2D(SRH)  # Error check for plotting
+            N_images = _check_2D(SRH)  # Error check for plotting
 
             for i in range(N_images):
                 valid_datetime = self.wrfdate[i]
@@ -795,7 +793,7 @@ class Load_Domain(object):
             cmap = plt.get_cmap('gist_ncar')
             new_cmap = truncate_colormap(cmap, 0.2, 1)
 
-            N_images = __check_2D(data2D)  # Error check for plotting
+            N_images = _check_2D(data2D)  # Error check for plotting
 
             for i in range(N_images):
                 valid_datetime = self.wrfdate[i]
@@ -812,8 +810,8 @@ class Load_Domain(object):
                 self._finalize_save(save_name, valid_datetime)
 
         elif var == 'Column_SMOIS':
-            smois = __load_var('SMOIS')
-            sh2o = __load_var('SH2O')
+            smois = _load('SMOIS')
+            sh2o = _load('SH2O')
             # thickness_soil = self.data[0]['DZS'][:]  # thickness of soil layer
             data2D = np.mean(smois, axis=-3) + np.mean(sh2o, axis=-3)
 
@@ -824,7 +822,7 @@ class Load_Domain(object):
             figtitle = avail[var]
             save_name = 'Column_SMOIS'
 
-            N_images = __check_2D(data2D)
+            N_images = _check_2D(data2D)
 
             for i in range(N_images):
                 valid_datetime = self.wrfdate[i]
@@ -840,9 +838,9 @@ class Load_Domain(object):
                 self._finalize_save(save_name, valid_datetime)
 
         elif var == 'Column_QVAPOR':
-            Q = __load_var('QVAPOR')
-            cloud = __load_var('QCLOUD')
-            rain = __load_var('QRAIN')+ __load_var('QICE')
+            Q = _load('QVAPOR')
+            cloud = _load('QCLOUD')
+            rain = _load('QRAIN')+ _load('QICE')
 
             data2D = np.nansum(Q, axis=-3)
             cloud = np.nansum(cloud, axis=-3)
@@ -858,7 +856,7 @@ class Load_Domain(object):
             figtitle = 'Column Vapor'
             save_name = 'QVAPOR'
 
-            N_images = __check_2D(data2D)
+            N_images = _check_2D(data2D)
 
             for i in range(N_images):
                 valid_datetime = self.wrfdate[i]
@@ -886,7 +884,7 @@ class Load_Domain(object):
                 self._finalize_save(save_name, valid_datetime)
 
         elif var == 'Column_Q-Hydro':
-            QC = __load_var('QCLOUD') + __load_var('QRAIN')+ __load_var('QICE')
+            QC = _load('QCLOUD') + _load('QRAIN')+ _load('QICE')
             # thickness_soil = self.data[0]['DZS'][:]  # thickness of soil layer
             data2D = np.nansum(QC, axis=-3)
 
@@ -897,7 +895,7 @@ class Load_Domain(object):
             figtitle = 'Column Cloud+Rain+Ice'
             save_name = 'Cloud+Rain+Ice'
 
-            N_images = __check_2D(data2D)
+            N_images = _check_2D(data2D)
 
             for i in range(N_images):
                 valid_datetime = self.wrfdate[i]
@@ -927,7 +925,7 @@ class Load_Domain(object):
             mean_xpoints = self.XY_gridpoints**(.5)
             nbarbs = 1 + int(mean_xpoints/objective_resolution)
 
-            data = __load_var('W')
+            data = _load('W')
             data2D = np.nanmax(data, axis=-3)
 
             color_min = np.nanmin(data2D)
@@ -937,7 +935,7 @@ class Load_Domain(object):
             figtitle = 'Max. Updraft velocity'
             save_name = 'Updraft'
 
-            N_images = __check_2D(data2D)
+            N_images = _check_2D(data2D)
 
             for i in range(N_images):
                 valid_datetime = self.wrfdate[i]
@@ -977,7 +975,7 @@ class Load_Domain(object):
             # cmap = plt.get_cmap('gist_ncar_r')
             # cmap = truncate_colormap(cmap, 0, 0.9)
 
-            N_images = __check_2D(data2D)
+            N_images = _check_2D(data2D)
 
             for i in range(N_images):
                 valid_datetime = self.wrfdate[i]
@@ -1012,7 +1010,7 @@ class Load_Domain(object):
             # cmap = plt.get_cmap('gist_ncar_r')
             # cmap = truncate_colormap(cmap, 0, 0.9)
 
-            N_images = __check_2D(data2D)
+            N_images = _check_2D(data2D)
 
             for i in range(N_images):
                 valid_datetime = self.wrfdate[i]
@@ -1059,3 +1057,65 @@ class Load_Domain(object):
             self._make_layout(figtitle, valid_datetime)
             self._makeplot_sfcflux(i, grdflux[i], cmap='RdBu_r')
             self._finalize_save(save_name, valid_datetime)
+
+
+class Compare_Experiments(Load_Domain):
+    """Compares
+
+    EasyWRF.Compare_Experiments(('./case1-wrfouts/', './case2-wrfouts/'),
+                                'testdomain',
+                                variables = ('OLR', ),
+                                )
+
+
+
+
+    """
+    def __init__(self, WRFout_data_directories_list, domainname="MyDomain",
+                 variables = ('OLR', ),
+                 coast=True,
+                 river=False,
+                 austrianborders=True,
+                 bezirk=True):
+                 #super(Compare_Experiments, self).
+        WRF_objects = [Load_Domain(WRFout_data_directories_list[0], domainname,
+                                coast=True,
+                                river=False,
+                                austrianborders=True,
+                                bezirk=True) for i in WRFout_data_directories_list]
+        main = WRF_objects[0]
+        print WRF_objects
+
+        """ Difference Plots"""
+        data1 = WRF_objects[0]._load_var('OLR')
+        data2 = WRF_objects[1]._load_var('OLR')
+
+        dif = data1-data2
+
+        color_range = (np.nanmin(dif), np.nanmax(dif))
+        print 'data min: '+str(color_range[0])+' max: '+str(color_range[1])
+        color_max  = max(abs(color_range[1]),abs(color_range[0]))
+        if color_max == 0:
+            print 'fields are the same - difference is zero!'
+        color_min = -color_max
+
+        figtitle = 'OLR'
+        save_name = 'OLR_dif'
+
+        cbar_label = ''
+
+        N_images = _check_2D(dif)
+
+        for i in range(N_images):
+            valid_datetime = main.wrfdate[i]
+            main._make_layout(figtitle, valid_datetime)
+
+            main._plot_heatmap(dif[i],
+                               interpolation = 'nearest',
+                               cmap='RdBu',
+                               color_min=color_min, color_max=color_max,
+                               N_colors=20,
+                               cbar_tickformat="%d",  #1e-3,
+                               cbar_label=cbar_label)
+
+            main._finalize_save(save_name, valid_datetime)
