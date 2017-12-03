@@ -1083,7 +1083,7 @@ class Compare_Experiments(Load_Domain):
                                 river=False,
                                 austrianborders=True,
                                 bezirk=True) for eachdir in WRFout_data_directories_list]
-        main = WRF_objects[0]
+        WRF_obj_cntrl = WRF_objects[0]
 
         for var in variables:
             """ Difference Plots"""
@@ -1098,24 +1098,57 @@ class Compare_Experiments(Load_Domain):
                 print 'fields are the same - difference is zero!'
             color_min = -color_max
 
-            figtitle = main.data[0][var].description+' Difference'
+            figtitle = WRF_obj_cntrl.data[0][var].description+' Difference'
             save_name = var+'_dif'
 
-            cbar_label = main.data[0][var].units
+            cbar_label = WRF_obj_cntrl.data[0][var].units
 
             N_images = _check_2D(dif)
 
             for i in range(N_images):
-                valid_datetime = main.wrfdate[i]
-                print valid_datetime
-                main._make_layout(figtitle, valid_datetime)
+                valid_datetime = WRF_obj_cntrl.wrfdate[i]
+                WRF_obj_cntrl._make_layout(figtitle, valid_datetime)
 
-                main._plot_heatmap(dif[i],
+                WRF_obj_cntrl._plot_heatmap(dif[i],
                                    interpolation = 'nearest',
-                                   cmap='RdBu',
+                                   cmap='RdBu_r',
                                    color_min=color_min, color_max=color_max,
                                    N_colors=20,
                                    cbar_tickformat="%d",  #1e-3,
                                    cbar_label=cbar_label)
 
-                main._finalize_save(save_name, valid_datetime)
+                WRF_obj_cntrl._finalize_save(save_name, valid_datetime)
+
+            """Plot the control run of the experiment"""
+            color_range = (np.nanmin(data1), np.nanmax(data1))
+            print 'data min: '+str(color_range[0])+' max: '+str(color_range[1])
+            color_max = color_range[1]
+            color_min = color_range[0]
+
+            # schraffieren
+            contour_boundaries = (np.nanmin(dif), np.percentile(dif,10), np.percentile(dif,90), np.nanmax(dif))
+
+            figtitle = WRF_obj_cntrl.data[0][var].description+' - Control Run'
+            save_name = var+'_cntrl'
+
+            cbar_label = WRF_obj_cntrl.data[0][var].units
+
+            N_images = _check_2D(data1)
+
+            for i in range(N_images):
+                valid_datetime = WRF_obj_cntrl.wrfdate[i]
+                WRF_obj_cntrl._make_layout(figtitle, valid_datetime)
+
+                WRF_obj_cntrl.bm.contourf(WRF_obj_cntrl.x, WRF_obj_cntrl.y, dif[i],
+                                 contour_boundaries, colors='none',
+                                 hatches=['---', None, '+++'], zorder=5)
+
+                WRF_obj_cntrl._plot_heatmap(data1[i],
+                                   interpolation = 'nearest',
+                                   cmap='gist_ncar_r',
+                                   color_min=color_min, color_max=color_max,
+                                   N_colors=20,
+                                   cbar_tickformat="%d",  #1e-3,
+                                   cbar_label=cbar_label)
+
+                WRF_obj_cntrl._finalize_save(save_name, valid_datetime)
