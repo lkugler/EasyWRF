@@ -15,27 +15,23 @@ import wrf
 from wrf import (getvar, ALL_TIMES, interplevel, to_np, latlon_coords,
                  disable_xarray, enable_xarray, smooth2d, get_basemap,
                  CoordPair, vertcross)
+
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-import matplotlib.colors as mc
-from matplotlib.cm import get_cmap
-from matplotlib import gridspec
-import pandas as pd
+
 import numpy as np
 import os, sys
-import time
 from datetime import datetime
-import locale
 
 from matplotlib import rc
 rc('font',**{'family':'monospace'})
 #rc('font',**{'family':'serif','serif':['Times']})
 #rc('text', usetex=True)
 matplotlib.rcParams.update({'font.size': 9})
-import matplotlib.ticker
 
-from mypickle import *
+from mypickle import load_pickle, save_pickle
+from aux import Timer, OOMFormatter, truncate_colormap
 
 modulepath = os.path.dirname(__file__)
 
@@ -62,56 +58,7 @@ def PressReduction(QFE, ALT):
     PMSL= QFE*(1-gamma*ALT/(288.15*(QFE/P0)**(-R_air*gamma/g)))**(-g/R_air/gamma)
     return PMSL
 
-class Timer(object):
-    """Provides simple timing of code for debugging.
 
-    Example call:
-        with Timer('Plotting Figure1'):
-            plt.plot( some stuff )  # plotting
-    """
-
-    def __init__(self, name=' '):
-        self.name = name
-
-    def __enter__(self):
-        self.elapsed = -time.time()
-
-    def __exit__(self, type, value, traceback):
-        print '['+str(self.name)+'] Elapsed: '+str(self.elapsed + time.time())+' secs'
-
-
-class OOMFormatter(matplotlib.ticker.ScalarFormatter):
-    """Format colorbar by scientific notation 10^3 etc
-
-    Example call:
-        cbar_tickformat = OOMFormatter(-3, mathText=False)
-    """
-
-    def __init__(self, order=0, fformat="%1.1f", offset=True, mathText=True):
-        self.oom = order
-        self.fformat = fformat
-        matplotlib.ticker.ScalarFormatter.__init__(self,useOffset=offset,useMathText=mathText)
-    def _set_orderOfMagnitude(self, nothing):
-        self.orderOfMagnitude = self.oom
-    def _set_format(self, vmin, vmax):
-        self.format = self.fformat
-        if self._useMathText:
-            self.format = '$%s$' % matplotlib.ticker._mathdefault(self.format)
-
-def truncate_colormap(cmap, minval=0.0, color_max=1.0, n=100):
-    """Create new colormap from a given one. From stackexchange.
-
-    Trunkates colormaps somewhere btw older minimum color (0) and maximum color (1).
-    If color_max>1, the last color extends after 1.
-
-    Example:
-        new_cmap = truncate_colormap(plt.get_cmap('terrain'),
-                                     0.1, 0.75)
-    """
-    new_cmap = mc.LinearSegmentedColormap.from_list(
-        'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap.name, a=minval, b=color_max),
-        cmap(np.linspace(minval, color_max, n)))
-    return new_cmap
 
 class Load_Domain(object):
     """HIGH LEVEL THING
@@ -209,6 +156,10 @@ class Load_Domain(object):
 
         self.data = datalist
         print 'successfully loaded', len(datalist), 'wrfout files'
+
+        # TODO: python indexing for 1 file?
+        if len(datalist)==1:
+            print 'WARN: for 1 wrfout file other python indexing neccessary -> will fail!'
 
     def _make_layout(self, figtitle, valid_datetime):
         """Prepare the figure by plotting titles, country boundaries etc."""
@@ -314,7 +265,7 @@ class Load_Domain(object):
             cbar_ticks = np.linspace(color_min, color_max, N_ticks, endpoint=True)
 
         """Plot the Heatmap"""
-        norm = mc.BoundaryNorm(cbar_ticks, 256)
+        norm = matplotlib.colors.BoundaryNorm(cbar_ticks, 256)
         self.heatmap = self.bm.imshow(data_2D, interpolation=interpolation,
                                       vmin=color_min, vmax=color_max,
                                       cmap=cmap, norm=norm, zorder=1)
@@ -380,7 +331,7 @@ class Load_Domain(object):
         self.cbar_tickformat = "%d"  # OOMFormatter(-3, mathText=False)  #1e-3
 
 
-        norm = mc.BoundaryNorm(self.cbar_ticks, 256)
+        norm = matplotlib.colors.BoundaryNorm(self.cbar_ticks, 256)
         self.cf1 = self.bm.contourf(self.x, self.y, data_2D,
                                     self.cbar_ticks, vmin=color_min, vmax=color_max,
                                     cmap=cmap, norm=norm, zorder=1)
@@ -395,7 +346,7 @@ class Load_Domain(object):
         self.cbar_ticks = np.linspace(color_min, color_max, N_colors+1, endpoint=True)
         self.cbar_tickformat = "%d"
 
-        norm = mc.BoundaryNorm(self.cbar_ticks, 256)
+        norm = matplotlib.colors.BoundaryNorm(self.cbar_ticks, 256)
         self.cf1 = self.bm.contourf(self.x, self.y, T-273.15+290,
                                     self.cbar_ticks, vmin=color_min, vmax=color_max, alpha=0.7,
                                     cmap='gist_ncar', norm=norm, zorder=1)
@@ -441,7 +392,7 @@ class Load_Domain(object):
         self.cbar_ticks = np.linspace(color_min, color_max, N_colors+1, endpoint=True)
         self.cbar_tickformat = "%d"
 
-        norm = mc.BoundaryNorm(self.cbar_ticks, 256)
+        norm = matplotlib.colors.BoundaryNorm(self.cbar_ticks, 256)
         self.cf1 = self.bm.contourf(self.x, self.y, RELTOP,
                                     self.cbar_ticks, vmin=color_min, vmax=color_max, alpha=0.7,
                                     cmap='gist_ncar', norm=norm, zorder=1)
@@ -466,10 +417,10 @@ class Load_Domain(object):
         self.cbar_ticks = np.linspace(self.color_min, self.color_max, N_colors+1, endpoint=True)
         self.cbar_tickformat = "%d"
 
-        norm = mc.BoundaryNorm(self.cbar_ticks, 256)
+        norm = matplotlib.colors.BoundaryNorm(self.cbar_ticks, 256)
         self.cf1 = self.bm.imshow(Vort, interpolation='nearest',
                                   vmin=self.color_min, vmax=self.color_max, alpha=0.7,
-                                  cmap=get_cmap("RdBu_r"), norm=norm, zorder=1)
+                                  cmap=plt.get_cmap("RdBu_r"), norm=norm, zorder=1)
 
     def _how2plot(self, wrfout_variable, data):
         """How to plot a wrfout variable"""
@@ -554,52 +505,7 @@ class Load_Domain(object):
     ##################
     # EASY TO USE FUNCTIONs
 
-    # def plot_landclass(self):
-    #     # plotting
-    #     first_wrfout = self.data[0]
-    #     figtitle = first_wrfout['LU_INDEX'].description
-    #     save_name = 'LU_INDEX'
-    #
-    #     valid_datetime = self.wrfdate[0]
-    #     self._make_layout(figtitle, valid_datetime)
-    #
-    #     lclass = getvar(self.data, "LU_INDEX", method="cat")
-    #
-    #     color_min = 0
-    #     color_max = np.nanmax(lclass)
-    #
-    #     self.cf1 = self.bm.imshow(lclass, interpolation='nearest',
-    #                               vmin=np.nanmin(lclass),
-    #                               vmax=np.nanmax(lclass))
-    #
-    #     self._finalize_save(save_name, valid_datetime)
-    #
-    #
-    # def plot_hgt(self):
-    #     cmap = plt.get_cmap('terrain')
-    #     new_cmap = truncate_colormap(cmap, 0, 1.225)
-    #
-    #     first_wrfout = self.data[0]
-    #     figtitle = first_wrfout['HGT'].description
-    #     save_name = 'HGT'
-    #
-    #     valid_datetime = self.wrfdate[0]
-    #     self._make_layout(figtitle, valid_datetime)
-    #
-    #     h_colorstep = 250
-    #     color_min = 0
-    #     color_max = int(np.nanmax(self.hgt)/250+1)*250
-    #     N = (self.color_max-self.color_min)/250
-    #
-    #     self.cf1 = self.bm.imshow(self.hgt, interpolation = 'nearest',
-    #                               vmin=color_min, vmax=color_max,
-    #                               cmap=new_cmap, zorder=1)
-    #
-    #
-    #     self._finalize_save(save_name, valid_datetime)
-    #     plt.close('all')
-
-    def plot2Dvar(self, wrfout_variable):
+    def plot(self, wrfout_variable):
         """ Simple to use routine for plotting builtin wrfout variable
 
         ### Example:
@@ -667,7 +573,7 @@ class Load_Domain(object):
             self._finalize_save(save_name, valid_datetime)
 
 
-    def plot2D_derived(self, var='TE'):
+    def plot_derived(self, var='TE'):
         """ Simple to use routine for plotting derived variable
         from available list: 'TE' (Total Energy),
 
@@ -683,6 +589,7 @@ class Load_Domain(object):
                  'SRH': '0-3 km Storm Relative Helicity',
                  'max_dbz': 'Colucolor_min Maximum Simulated Reflectivity',
                  'Column_SMOIS': 'Column Mean Soil Moisture +H2O',
+                 'BT': 'Brightness Temperature'
                  }
 
         def __load_var(var):
@@ -841,21 +748,7 @@ class Load_Domain(object):
             except IOError as e:
                 print(e, 'loading failed')
 
-            # deltaV_oben = (V[:,1:,:-1]-V[:, :-1,:-1])
-            # deltaV_unten = (V[:,1:,1:]-V[:, :-1,1:])
-            # dVdx = (deltaV_oben + deltaV_unten)/(2*self.dx)
-            #
-            # deltaU_west = U[:, :-1, 1:] - U[:, :-1, :-1]
-            # deltaU_ost = U[:, 1:, 1:] - U[:, 1:, :-1]
-            # dUdy = (deltaU_west + deltaU_ost)/(2*self.dx)
-            # Vort  = dVdx - dUdy
             SRH = wrf.helicity.get_srh(self.data, timeidx=wrf.ALL_TIMES)
-            #lats, lons = latlon_coords(SRH)
-            #self.bm = get_basemap(SRH)
-            #Vort = (V[:,1:,:]-V[:, :-1,:])/self.dx - (U[:,:,1:]-U[:, :,:-1])/self.dx
-            #
-            # U = wrf.wind.get_u_destag(self.data, timeidx=wrf.ALL_TIMES)
-            # V = wrf.wind.get_v_destag(self.data, timeidx=wrf.ALL_TIMES)
 
             # plotting range
             minval = np.floor(np.nanmin(SRH)/100)*100
@@ -1078,7 +971,7 @@ class Load_Domain(object):
             color_max = np.nanmax(data2D)
             print 'data min: '+str(color_min)+' max: '+str(color_max)
 
-            figtitle = 'Brightness Temperature'
+            figtitle = avail[var]
             save_name = 'BT'
 
             # cmap = plt.get_cmap('gist_ncar_r')
@@ -1139,6 +1032,8 @@ class Load_Domain(object):
                                       'not available. Use one of these:'+
                                       str(avail))
 
+
+    """Old functions"""
     def plot_SurfLay(self):
         hfx = to_np(getvar(self.data, "HFX", timeidx=ALL_TIMES, method="cat"))             # 10m u-component of wind [ms^-1]
         lhflux = to_np(getvar(self.data, "LH", timeidx=ALL_TIMES, method="cat"))
