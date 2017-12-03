@@ -39,6 +39,9 @@ kts_per_mps = 1.94384   # kts = mps * kts_per_mps
 c_p = 1005
 R_d = 287.16
 
+pix_width = 1080
+pix_height = 810 #756
+
 def _check_2D(data):
     if len(data.shape) == 3:
         N_images = data.shape[0]
@@ -178,7 +181,7 @@ class Load_Domain(object):
 
         # Create the figure
         plt.ioff()
-        fig, ax = plt.subplots(figsize=(1080./100, 756./100), dpi=100)
+        fig, ax = plt.subplots(figsize=(pix_width/100, pix_height/100), dpi=100)
 
         # Plot UNIVIE Logo
         try:
@@ -1145,7 +1148,7 @@ class Compare_Experiments(Load_Domain):
 
                 WRF_obj_cntrl._plot_heatmap(data1[i],
                                    interpolation = 'nearest',
-                                   cmap='gist_ncar_r',
+                                   cmap='viridis',
                                    color_min=color_min, color_max=color_max,
                                    N_colors=20,
                                    cbar_tickformat="%d",  #1e-3,
