@@ -1064,7 +1064,7 @@ class Compare_Experiments(Load_Domain):
 
     EasyWRF.Compare_Experiments(('./case1-wrfouts/', './case2-wrfouts/'),
                                 'testdomain',
-                                variables = ('OLR', ),
+                                variables = ['OLR', ],
                                 )
 
 
@@ -1072,50 +1072,50 @@ class Compare_Experiments(Load_Domain):
 
     """
     def __init__(self, WRFout_data_directories_list, domainname="MyDomain",
-                 variables = ('OLR', ),
+                 variables = ['OLR', ],
                  coast=True,
                  river=False,
                  austrianborders=True,
                  bezirk=True):
-                 #super(Compare_Experiments, self).
-        WRF_objects = [Load_Domain(WRFout_data_directories_list[0], domainname,
+
+        WRF_objects = [Load_Domain(eachdir, domainname,
                                 coast=True,
                                 river=False,
                                 austrianborders=True,
-                                bezirk=True) for i in WRFout_data_directories_list]
+                                bezirk=True) for eachdir in WRFout_data_directories_list]
         main = WRF_objects[0]
-        print WRF_objects
 
-        """ Difference Plots"""
-        data1 = WRF_objects[0]._load_var('OLR')
-        data2 = WRF_objects[1]._load_var('OLR')
+        for var in variables:
+            """ Difference Plots"""
+            data1 = WRF_objects[0]._load_var(var)
+            data2 = WRF_objects[1]._load_var(var)
+            dif = data2 - data1
 
-        dif = data1-data2
+            color_range = (np.nanmin(dif), np.nanmax(dif))
+            print 'data min: '+str(color_range[0])+' max: '+str(color_range[1])
+            color_max  = max(abs(color_range[1]),abs(color_range[0]))
+            if color_max == 0:
+                print 'fields are the same - difference is zero!'
+            color_min = -color_max
 
-        color_range = (np.nanmin(dif), np.nanmax(dif))
-        print 'data min: '+str(color_range[0])+' max: '+str(color_range[1])
-        color_max  = max(abs(color_range[1]),abs(color_range[0]))
-        if color_max == 0:
-            print 'fields are the same - difference is zero!'
-        color_min = -color_max
+            figtitle = main.data[0][var].description+' Difference'
+            save_name = var+'_dif'
 
-        figtitle = 'OLR'
-        save_name = 'OLR_dif'
+            cbar_label = main.data[0][var].units
 
-        cbar_label = ''
+            N_images = _check_2D(dif)
 
-        N_images = _check_2D(dif)
+            for i in range(N_images):
+                valid_datetime = main.wrfdate[i]
+                print valid_datetime
+                main._make_layout(figtitle, valid_datetime)
 
-        for i in range(N_images):
-            valid_datetime = main.wrfdate[i]
-            main._make_layout(figtitle, valid_datetime)
+                main._plot_heatmap(dif[i],
+                                   interpolation = 'nearest',
+                                   cmap='RdBu',
+                                   color_min=color_min, color_max=color_max,
+                                   N_colors=20,
+                                   cbar_tickformat="%d",  #1e-3,
+                                   cbar_label=cbar_label)
 
-            main._plot_heatmap(dif[i],
-                               interpolation = 'nearest',
-                               cmap='RdBu',
-                               color_min=color_min, color_max=color_max,
-                               N_colors=20,
-                               cbar_tickformat="%d",  #1e-3,
-                               cbar_label=cbar_label)
-
-            main._finalize_save(save_name, valid_datetime)
+                main._finalize_save(save_name, valid_datetime)
