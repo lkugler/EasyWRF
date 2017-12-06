@@ -216,6 +216,8 @@ class Load_Domain(object):
         # Adding 'initdate' and 'validdate' as textboxes
         validdate = valid_datetime.strftime('Valid: %a, %d.%m.%Y %H:%M UTC')
         resolution = ('WRF-V3.8 @ ' + str(np.round(self.dx/1000,1)) + 'km')
+        copyright = '$\copyright$ Lukas Kugler'
+
         ax.text(1, 1.04, initdate,
                 verticalalignment='bottom', horizontalalignment='right',
                 transform=ax.transAxes,
@@ -224,7 +226,7 @@ class Load_Domain(object):
                 verticalalignment='bottom', horizontalalignment='right',
                 transform=ax.transAxes,
                 color='black', fontsize=9)
-        ax.text(1.01, 0.8, resolution,
+        ax.text(1.008, 0.85, resolution,
                 verticalalignment='center', horizontalalignment='left',
                 rotation=90,
                 transform=ax.transAxes,
@@ -233,6 +235,11 @@ class Load_Domain(object):
                 verticalalignment='bottom', horizontalalignment='left',
                 transform=ax.transAxes,
                 fontsize=11)
+        ax.text(1.008, 0.15, copyright,
+                verticalalignment='center', horizontalalignment='left',
+                rotation=90,
+                transform=ax.transAxes,
+                color='black', fontsize=8)
 
         fig.subplots_adjust(top=0.94, bottom=0.11)
         self.fig = fig
@@ -270,12 +277,13 @@ class Load_Domain(object):
                      N_colors=14,
                      N_ticks = None,
                      cbar_tickformat=None,
-                     cbar_label=None):
+                     cbar_label=None,
+                     cbar_ticks=None):
 
         if N_ticks is None:
             N_ticks = N_colors+1
 
-        if color_min is not None and color_max is not None:
+        if color_min is not None and color_max is not None and cbar_ticks is None:
             cbar_ticks = np.linspace(color_min, color_max, N_ticks, endpoint=True)
 
         """Plot the Heatmap"""
@@ -783,10 +791,17 @@ class Load_Domain(object):
             # U, V = uvmet.get_uvmet(self.data, timeidx=wrf.ALL_TIMES)[:,0,:,:]
             # print U, V
             # plotting range
+            data2D = np.array(data2D)
+            data2D[data2D < 0.2] = np.nan
 
             color_min = np.nanmin(data2D)
             color_max = np.nanmax(data2D)
             print 'data min: '+str(color_min)+' max: '+str(color_max)
+
+            minval = np.log10(0.5)
+            maxval = np.log10(140)
+            cbar_ticks = np.logspace(minval, maxval, 12, endpoint=True)
+            print cbar_ticks
 
             # plotting options
             figtitle = 'Max. Column Reflectivity'
@@ -794,7 +809,7 @@ class Load_Domain(object):
             cbar_label = 'dBz'
 
             cmap = plt.get_cmap('gist_ncar')
-            new_cmap = truncate_colormap(cmap, 0.2, 1)
+            new_cmap = truncate_colormap(cmap, 0.2, 0.9)
 
             N_images = _check_2D(data2D)  # Error check for plotting
 
@@ -804,10 +819,9 @@ class Load_Domain(object):
 
                 self._plot_heatmap(data2D[i], cmap=new_cmap,
                                 interpolation = 'bilinear',
-                                color_min=-10, color_max=60,
-                                N_colors=25,
-                                cbar_tickformat=OOMFormatter(-3, fformat="%d", mathText=False),  #1e-3,
-                                cbar_label="propto kg/m^2")
+                                cbar_tickformat = "%0.1f",  #1e-3,
+                                cbar_label = cbar_label,
+                                cbar_ticks = cbar_ticks)
                 #self._add_barbs(U[i], V[i])  # add wind lowest model level
 
                 self._finalize_save(save_name, valid_datetime)
