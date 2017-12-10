@@ -1115,6 +1115,8 @@ class Compare_Experiments(Load_Domain):
                                 austrianborders=austrianborders,
                                 bezirk=bezirk)
 
+        self.cntrl = WRF_obj_cntrl
+
         for dirname, WRF_object in zip(WRFout_data_directories_list, WRF_objects):
             print 'Comparing '+dirname+' to controlrun ...'
             case = str(dirname.split('/')[-2])
@@ -1181,7 +1183,7 @@ class Compare_Experiments(Load_Domain):
 
                     WRF_obj_cntrl.ax.legend(handles = [hh1,hh2,hh3,hh4], fontsize=9, loc=2)
 
-                    WRF_obj_cntrl._finalize_save(save_name, valid_datetime)
+                    self._save(case, save_name, valid_datetime)
 
                 """ Difference Plots"""
                 color_range = (np.nanmin(dif), np.nanmax(dif))
@@ -1208,4 +1210,15 @@ class Compare_Experiments(Load_Domain):
                                        cbar_tickformat="%d",  #1e-3,
                                        cbar_label=cbar_label)
 
-                    WRF_obj_cntrl._finalize_save(save_name, valid_datetime)
+                    self._save(case, save_name, valid_datetime)
+
+    def _save(self, case, var_name, dt_valid):
+        init = datetime.strptime(self.cntrl.init, '%Y-%m-%d_%H:%M:%S')
+        savedir = './img/'+init.strftime('%Y%m%d%H')+'/'+case+'/'
+        if not os.path.exists(savedir):
+            os.makedirs(savedir)
+
+        filename = var_name + '_' + dt_valid.strftime('%y%m%d_%H%M') + '.png'
+        plt.savefig(savedir + filename, dpi=100)
+        plt.close('all')
+        print filename, 'saved'
