@@ -19,6 +19,7 @@ from wrf import (getvar, ALL_TIMES, interplevel, to_np, latlon_coords,
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 
 import numpy as np
 import os, sys
@@ -147,18 +148,18 @@ class Load_Domain(object):
         if wrfpath[-1] is not '/':
             wrfpath+='/'
 
-        wrffiles = os.listdir(wrfpath)
+        wrffiles = []
+        for each in os.listdir(wrfpath):
+            if each.startswith('wrfout_d'):
+                wrffiles.append(each)
+
         if len(wrffiles) < 2:
+            print 'wrffiles:',wrffiles
             raise IOError('Not enough wrfout files.')
 
-        n = 0
-        for i in range(len(wrffiles)):
-            if ('wrfout_d') in wrffiles[i]:
-                if n == 0:
-                    wrflist = [(wrfpath + wrffiles[i])]
-                elif n > 0:
-                    wrflist = wrflist + [(wrfpath + wrffiles[i])]
-                n = n+1
+        wrflist = []
+        for eachfile in wrffiles:
+            wrflist.append(wrfpath+eachfile)
         wrflist.sort()
 
         datalist = []
@@ -801,7 +802,6 @@ class Load_Domain(object):
             minval = np.log10(0.5)
             maxval = np.log10(140)
             cbar_ticks = np.logspace(minval, maxval, 12, endpoint=True)
-            print cbar_ticks
 
             # plotting options
             figtitle = 'Max. Column Reflectivity'
@@ -1088,84 +1088,124 @@ class Compare_Experiments(Load_Domain):
 
 
     """
-    def __init__(self, WRFout_data_directories_list, domainname="MyDomain",
-                 variables = ['OLR', ],
+    def __init__(self,
+                 controlrun = './control/',
+                 others = ['./experiment1/', ],
+                 domainname = "MyDomain",
+                 variables = ['T2', ],
                  coast=True,
                  river=False,
                  austrianborders=True,
                  bezirk=True):
 
+        # to clarify
+        WRFout_controlrun_data_directory = controlrun
+        WRFout_data_directories_list = others
+
+        # load objects
         WRF_objects = [Load_Domain(eachdir, domainname,
                                 coast=True,
                                 river=False,
                                 austrianborders=True,
                                 bezirk=True) for eachdir in WRFout_data_directories_list]
-        WRF_obj_cntrl = WRF_objects[0]
 
-        for var in variables:
-            """ Difference Plots"""
-            data1 = WRF_objects[0]._load_var(var)
-            data2 = WRF_objects[1]._load_var(var)
-            dif = data2 - data1
+        WRF_obj_cntrl = Load_Domain(WRFout_controlrun_data_directory, domainname,
+                                coast=coast,
+                                river=river,
+                                austrianborders=austrianborders,
+                                bezirk=bezirk)
 
-            color_range = (np.nanmin(dif), np.nanmax(dif))
-            print 'data min: '+str(color_range[0])+' max: '+str(color_range[1])
-            color_max  = max(abs(color_range[1]),abs(color_range[0]))
-            if color_max == 0:
-                print 'fields are the same - difference is zero!'
-            color_min = -color_max
+        for dirname, WRF_object in zip(WRFout_data_directories_list, WRF_objects):
+            print 'Comparing '+dirname+' to controlrun ...'
+            case = str(dirname.split('/')[-2])
 
-            figtitle = WRF_obj_cntrl.data[0][var].description+' Difference'
-            save_name = var+'_dif'
+            for var in variables:
+                print 'Variable: '+var
+                figtitle = WRF_obj_cntrl.data[0][var].description+': '+case+'-Control'
 
-            cbar_label = WRF_obj_cntrl.data[0][var].units
+                cntrl_data = WRF_obj_cntrl._load_var(var)
+                data2 = WRF_object._load_var(var)
+                dif = data2 - cntrl_data
 
-            N_images = _check_2D(dif)
+                """Plot the control run of the experiment
+                to compare with
+                """
+                color_range = (np.nanmin(cntrl_data), np.nanmax(cntrl_data))
+                print 'data min: '+str(color_range[0])+' max: '+str(color_range[1])
+                color_max = color_range[1]
+                color_min = color_range[0]
 
-            for i in range(N_images):
-                valid_datetime = WRF_obj_cntrl.wrfdate[i]
-                WRF_obj_cntrl._make_layout(figtitle, valid_datetime)
+                # schraffieren
+                contour_boundaries = (np.nanmin(dif),
+                                      np.percentile(dif,10),
+                                      np.percentile(dif,20),
+                                      np.percentile(dif,80),
+                                      np.percentile(dif,90),
+                                      np.nanmax(dif))
 
-                WRF_obj_cntrl._plot_heatmap(dif[i],
-                                   interpolation = 'nearest',
-                                   cmap='RdBu_r',
-                                   color_min=color_min, color_max=color_max,
-                                   N_colors=20,
-                                   cbar_tickformat="%d",  #1e-3,
-                                   cbar_label=cbar_label)
+                hatches = ['///', '//', None, '+', '++']
 
-                WRF_obj_cntrl._finalize_save(save_name, valid_datetime)
+                save_name = var+'_cntrl'
+                cbar_label = WRF_obj_cntrl.data[0][var].units
 
-            """Plot the control run of the experiment"""
-            color_range = (np.nanmin(data1), np.nanmax(data1))
-            print 'data min: '+str(color_range[0])+' max: '+str(color_range[1])
-            color_max = color_range[1]
-            color_min = color_range[0]
+                def mk_txt(a,b,c):
+                    return ' '.join([a,str(np.round(b,1)),c])
 
-            # schraffieren
-            contour_boundaries = (np.nanmin(dif), np.percentile(dif,10), np.percentile(dif,90), np.nanmax(dif))
+                txt0 = '$\Delta >$'
+                txt = mk_txt(txt0,contour_boundaries[4],cbar_label)
+                hh4 = mpatches.Patch(facecolor='w',hatch=hatches[4],label=txt)
+                txt = mk_txt(txt0,contour_boundaries[3],cbar_label)
+                hh3 = mpatches.Patch(facecolor='w',hatch=hatches[3],label=txt)
+                txt = mk_txt(txt0,contour_boundaries[2],cbar_label)
+                hh2 = mpatches.Patch(facecolor='w',hatch=hatches[1],label=txt)
+                txt = mk_txt(txt0,contour_boundaries[1],cbar_label)
+                hh1 = mpatches.Patch(facecolor='w',hatch=hatches[0],label=txt)
 
-            figtitle = WRF_obj_cntrl.data[0][var].description+' - Control Run'
-            save_name = var+'_cntrl'
+                N_images = _check_2D(cntrl_data)
 
-            cbar_label = WRF_obj_cntrl.data[0][var].units
+                for i in range(N_images):
+                    valid_datetime = WRF_obj_cntrl.wrfdate[i]
+                    WRF_obj_cntrl._make_layout(figtitle, valid_datetime)
 
-            N_images = _check_2D(data1)
+                    WRF_obj_cntrl.bm.contourf(WRF_obj_cntrl.x, WRF_obj_cntrl.y, dif[i],
+                                     contour_boundaries, colors='none',
+                                     hatches=hatches, zorder=5)
 
-            for i in range(N_images):
-                valid_datetime = WRF_obj_cntrl.wrfdate[i]
-                WRF_obj_cntrl._make_layout(figtitle, valid_datetime)
+                    WRF_obj_cntrl._plot_heatmap(cntrl_data[i],
+                                       interpolation = 'nearest',
+                                       cmap='viridis',
+                                       color_min=color_min, color_max=color_max,
+                                       N_colors=20,
+                                       cbar_tickformat="%d",  #1e-3,
+                                       cbar_label=cbar_label)
 
-                WRF_obj_cntrl.bm.contourf(WRF_obj_cntrl.x, WRF_obj_cntrl.y, dif[i],
-                                 contour_boundaries, colors='none',
-                                 hatches=['---', None, '+++'], zorder=5)
+                    WRF_obj_cntrl.ax.legend(handles = [hh1,hh2,hh3,hh4], fontsize=9, loc=2)
 
-                WRF_obj_cntrl._plot_heatmap(data1[i],
-                                   interpolation = 'nearest',
-                                   cmap='viridis',
-                                   color_min=color_min, color_max=color_max,
-                                   N_colors=20,
-                                   cbar_tickformat="%d",  #1e-3,
-                                   cbar_label=cbar_label)
+                    WRF_obj_cntrl._finalize_save(save_name, valid_datetime)
 
-                WRF_obj_cntrl._finalize_save(save_name, valid_datetime)
+                """ Difference Plots"""
+                color_range = (np.nanmin(dif), np.nanmax(dif))
+                print 'data min: '+str(color_range[0])+' max: '+str(color_range[1])
+                color_max  = max(abs(color_range[1]),abs(color_range[0]))
+                if color_max == 0:
+                    print 'fields are the same - difference is zero!'
+                color_min = -color_max
+
+                save_name = var+'_dif'
+                cbar_label = WRF_obj_cntrl.data[0][var].units
+
+                N_images = _check_2D(dif)
+
+                for i in range(N_images):
+                    valid_datetime = WRF_obj_cntrl.wrfdate[i]
+                    WRF_obj_cntrl._make_layout(figtitle, valid_datetime)
+
+                    WRF_obj_cntrl._plot_heatmap(dif[i],
+                                       interpolation = 'nearest',
+                                       cmap='RdBu_r',
+                                       color_min=color_min, color_max=color_max,
+                                       N_colors=20,
+                                       cbar_tickformat="%d",  #1e-3,
+                                       cbar_label=cbar_label)
+
+                    WRF_obj_cntrl._finalize_save(save_name, valid_datetime)
