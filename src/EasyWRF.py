@@ -799,7 +799,7 @@ class Load_Domain(object):
             color_max = np.nanmax(data2D)
             print 'data min: '+str(color_min)+' max: '+str(color_max)
 
-            minval = np.log10(0.5)
+            minval = np.log10(15)
             maxval = np.log10(140)
             cbar_ticks = np.logspace(minval, maxval, 12, endpoint=True)
 
