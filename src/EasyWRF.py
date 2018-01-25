@@ -1065,7 +1065,7 @@ class Load_Domain(object):
 
 
 class Compare_Experiments(Load_Domain):
-    """Compares
+    """Compares fields wrfout.nc files
 
     EasyWRF.Compare_Experiments(('./case1-wrfouts/', './case2-wrfouts/'),
                                 'testdomain',
