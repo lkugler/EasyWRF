@@ -80,7 +80,7 @@ class Load_Domain(object):
                  coast=True,
                  river=False,
                  austrianborders=True,
-                 bezirk=True
+                 bezirk=True,
                  imgw=False):
         self.coast = coast
         self.river = river
