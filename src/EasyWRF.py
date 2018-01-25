@@ -86,6 +86,7 @@ class Load_Domain(object):
         self.river = river
         self.austrianborders = austrianborders
         self.bezirk = bezirk
+        self.imgw = imgw
 
         self.load_WRFout_data(WRFout_data_directory)
         self.domainname = domainname
@@ -175,12 +176,13 @@ class Load_Domain(object):
         plt.ioff()
         fig, ax = plt.subplots(figsize=(pix_width/100, pix_height/100), dpi=100)
 
-        if imgw:  # Plot UNIVIE Logo
-            try:
-                img = plt.imread(modulepath+'/../shapefiles/logo_imgw.png')
-                fig.figimage(img, 0, 0)
-            except Exception as e:
-                print e, 'unable to plot imgw logo'
+        if hasattr(self, 'imgw'):  # Plot UNIVIE Logo
+            if self.imgw:
+                try:
+                    img = plt.imread(modulepath+'/../shapefiles/logo_imgw.png')
+                    fig.figimage(img, 0, 0)
+                except Exception as e:
+                    print e, 'unable to plot imgw logo'
 
         # Plot grid lines dependent on resolution
         if self.dx < 12000:
