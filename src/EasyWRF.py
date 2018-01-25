@@ -80,7 +80,8 @@ class Load_Domain(object):
                  coast=True,
                  river=False,
                  austrianborders=True,
-                 bezirk=True):
+                 bezirk=True
+                 imgw=False):
         self.coast = coast
         self.river = river
         self.austrianborders = austrianborders
@@ -174,12 +175,12 @@ class Load_Domain(object):
         plt.ioff()
         fig, ax = plt.subplots(figsize=(pix_width/100, pix_height/100), dpi=100)
 
-        # Plot UNIVIE Logo
-        try:
-            img = plt.imread(modulepath+'/../shapefiles/logo_imgw.png')
-            fig.figimage(img, 0, 0)
-        except Exception as e:
-            print e, 'unable to plot imgw logo'
+        if imgw:  # Plot UNIVIE Logo
+            try:
+                img = plt.imread(modulepath+'/../shapefiles/logo_imgw.png')
+                fig.figimage(img, 0, 0)
+            except Exception as e:
+                print e, 'unable to plot imgw logo'
 
         # Plot grid lines dependent on resolution
         if self.dx < 12000:
@@ -206,7 +207,8 @@ class Load_Domain(object):
 
         # Adding 'initdate' and 'validdate' as textboxes
         validdate = valid_datetime.strftime('Valid: %a, %d.%m.%Y %H:%M UTC')
-        resolution = ('WRF-V3.8 @ ' + str(np.round(self.dx/1000,1)) + 'km')
+        wrf_version = 'WRF-V3.8'  # TODO: get from file
+        resolution = (wrf_version+' @ ' + str(np.round(self.dx/1000,1)) + 'km')
         copyright = '$\copyright$ Lukas Kugler'
 
         ax.text(1, 1.04, initdate,
@@ -242,7 +244,6 @@ class Load_Domain(object):
 
     def _finalize_save(self, var_name, valid_datetime):
         """Saves the current figure."""
-
         init = datetime.strptime(self.init, '%Y-%m-%d_%H:%M:%S')
         savedir = './img/'+init.strftime('%Y%m%d%H')+'/'+self.domainname+'/'
         if not os.path.exists(savedir):
