@@ -2,13 +2,15 @@
 """Plotting Library for wrfout files.
 
 author: Lukas Kugler
-date: 03-12-2017
 
 Major bug:  - PRIORITY LOW
 kommt nicht zurecht, wenn nur ein wrfout file im ordner liegt!
 
 """
 from __future__ import division
+import os, sys
+import numpy as np
+from datetime import datetime
 
 from netCDF4 import Dataset
 import wrf
@@ -20,15 +22,8 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-
-import numpy as np
-import os, sys
-from datetime import datetime
-
 from matplotlib import rc
 rc('font',**{'family':'monospace'})
-#rc('font',**{'family':'serif','serif':['Times']})
-#rc('text', usetex=True)
 matplotlib.rcParams.update({'font.size': 9})
 
 from mypickle import load_pickle, save_pickle
@@ -65,19 +60,16 @@ def PressReduction(QFE, ALT):
     PMSL = np.empty(QFE.shape)
     gamma=  -0.0065
     P0=     1013.25
-    g=      9.80665 # ICAO
+    g=      9.80665
     R_air = 287.16
     #PMSL[m,n]=  P_SFC[m,n]*np.exp(-g*HGT[m,n]/R_air/(T_SFC[m,n]-HGT[m,n]*g))
     PMSL= QFE*(1-gamma*ALT/(288.15*(QFE/P0)**(-R_air*gamma/g)))**(-g/R_air/gamma)
     return PMSL
 
-
-
 class Load_Domain(object):
     """HIGH LEVEL THING
 
     import EasyWRF
-
     ThisWRF = EasyWRF.Load_Domain('./wrfout_dir/', 'DomainName')
 
     ThisWRF.plot('HGT')      # variables available within wrfout file
@@ -157,9 +149,7 @@ class Load_Domain(object):
             print 'wrffiles:',wrffiles
             raise IOError('Not enough wrfout files.')
 
-        wrflist = []
-        for eachfile in wrffiles:
-            wrflist.append(wrfpath+eachfile)
+        wrflist = [wrfpath+each for each in wrffiles]
         wrflist.sort()
 
         datalist = []
@@ -270,16 +260,15 @@ class Load_Domain(object):
         return to_np(getvar(self.data, var, timeidx=ALL_TIMES, method="cat"))
 
     """Plotting Routines"""
-
     def _plot_heatmap(self, data_2D,
-                      interpolation = 'nearest',
-                     cmap='viridis',
-                     color_min=None, color_max=None,
-                     N_colors=14,
-                     N_ticks = None,
-                     cbar_tickformat=None,
-                     cbar_label=None,
-                     cbar_ticks=None):
+                        interpolation = 'nearest',
+                        cmap='viridis',
+                        color_min=None, color_max=None,
+                        N_colors=14,
+                        N_ticks = None,
+                        cbar_tickformat=None,
+                        cbar_label=None,
+                        cbar_ticks=None):
 
         if N_ticks is None:
             N_ticks = N_colors+1
@@ -309,18 +298,18 @@ class Load_Domain(object):
     ###################################################################################
     """LEGACY CODE"""
 
-    def _get_div10(self):
-        if not hasattr(self, 'u10') or not hasattr(self, 'v10'):
-            self._get_u10()
-        if len(self.u1.shape)==3:
-            dv = self.v1[:,1:,:]-self.v1[:,:-1,:]   # 2nd : North/south, 3rd: west-east!
-            du = self.u1[:,:,1:]-self.u1[:,:,:-1]
-            self.div1 = du/self.dx + dv/self.dx
-
-            self.divmax = np.nanmax(self.div1)
-            self.divmin = np.nanmin(self.div1)
-        else:
-            raise NotImplementedError('len(self.u10.shape):',len(self.u10.shape))
+    # def _get_div10(self):
+    #     if not hasattr(self, 'u10') or not hasattr(self, 'v10'):
+    #         self._get_u10()
+    #     if len(self.u1.shape)==3:
+    #         dv = self.v1[:,1:,:]-self.v1[:,:-1,:]   # 2nd : North/south, 3rd: west-east!
+    #         du = self.u1[:,:,1:]-self.u1[:,:,:-1]
+    #         self.div1 = du/self.dx + dv/self.dx
+    #
+    #         self.divmax = np.nanmax(self.div1)
+    #         self.divmin = np.nanmin(self.div1)
+    #     else:
+    #         raise NotImplementedError('len(self.u10.shape):',len(self.u10.shape))
 
     def _get_u10(self):
         print 'loading u1, v1 ...'
@@ -361,7 +350,6 @@ class Load_Domain(object):
         self.color_min = color_min
         self.color_max = color_max
 
-
     def _plot_syn_boden(self, PMSL, U, V, T):
         color_min = -20
         color_max = 49
@@ -391,9 +379,9 @@ class Load_Domain(object):
         nbarbs = 1 + int(mean_xpoints/objective_resolution)
 
         self.bm.barbs(self.x[::nbarbs,::nbarbs], self.y[::nbarbs,::nbarbs],
-                 U[::nbarbs, ::nbarbs]*kts_per_mps,
-                 V[::nbarbs, ::nbarbs]*kts_per_mps,
-                 zorder=2, length=6, linewidth=0.5)
+                         U[::nbarbs, ::nbarbs]*kts_per_mps,
+                         V[::nbarbs, ::nbarbs]*kts_per_mps,
+                         zorder=2, length=6, linewidth=0.5)
 
     def _add_barbs(self, U, V):
         objective_resolution = 30 # wind barbs
@@ -403,9 +391,9 @@ class Load_Domain(object):
         print U.shape, V.shape, self.x.shape, self.y.shape
 
         self.bm.barbs(self.x[::nbarbs,::nbarbs], self.y[::nbarbs,::nbarbs],
-                U[::nbarbs, ::nbarbs],
-                V[::nbarbs, ::nbarbs],
-                zorder=2, length=6, linewidth=0.5)
+                        U[::nbarbs, ::nbarbs],
+                        V[::nbarbs, ::nbarbs],
+                        zorder=2, length=6, linewidth=0.5)
 
     def _plot_synoptik1(self, H500, PMSL, RELTOP):
 
